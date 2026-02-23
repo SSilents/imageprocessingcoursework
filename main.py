@@ -75,6 +75,15 @@ def clean_black_edge_rim(img, black_thresh=12, edge_band=24):
 
     return cv2.inpaint(img, rim_mask, 3, cv2.INPAINT_TELEA)
 
+
+def increase_sharpness(img, amount=1.2, blur_kernel=(0, 0), sigma=1.2):
+    if amount <= 0:
+        return img
+
+    blurred = cv2.GaussianBlur(img, blur_kernel, sigma)
+    sharpened = cv2.addWeighted(img, 1.0 + amount, blurred, -amount, 0)
+    return np.clip(sharpened, 0, 255).astype(np.uint8)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("path")
 args = parser.parse_args()
@@ -110,7 +119,7 @@ for name in os.listdir(input_path):
         mask = cv2.dilate(mask, k, iterations=1)
 
         # 3) infill
-        filled = cv2.inpaint(warped, mask, 3, cv2.INPAINT_TELEA)
+        filled = cv2.inpaint(warped, mask, 3, cv2.INPAINT_NS)
         
         # 4) balance colour
         lab = cv2.cvtColor(filled, cv2.COLOR_BGR2LAB)
@@ -127,6 +136,7 @@ for name in os.listdir(input_path):
         # 5) remove other noise
         bilater = cv2.bilateralFilter(balanced, 9, 75, 75)
         nonLocalDeNoise = cv2.fastNlMeansDenoisingColored(bilater, None, 10, 10, 7, 21)
+        sharpened = increase_sharpness(nonLocalDeNoise, amount=2.0)
 
-        cv2.imwrite(output_path,nonLocalDeNoise)
+        cv2.imwrite(output_path,sharpened)
         print(f"Processed: {name}")
